@@ -30,6 +30,8 @@
  * SOFTWARE.
  */
 
+require __DIR__ . '/vendor/autoload.php';
+
 class BadgeFactorCertificates
 {
     /**
@@ -79,6 +81,9 @@ class BadgeFactorCertificates
 
         add_action( 'admin_menu',     array($this, 'admin_menu'), 300);
         add_action( 'init', array($this, 'create_cpt_certificate'));
+
+        add_action('parse_request', array($this, 'display_certificate') );
+        add_action('acf/save_post', array($this, 'save_certificate_template'), 20 );
 
     }
 
@@ -169,7 +174,7 @@ class BadgeFactorCertificates
     public function create_cpt_certificate()
     {
         // Register the post type
-        register_post_type( 'certificates', array(
+        register_post_type( 'certificate', array(
             'labels'             => array(
                 'name'               => __( 'Certificates', 'badgefactor_cert'),
                 'singular_name'      => __( 'Certificate', 'badgefactor_cert'),
@@ -186,7 +191,7 @@ class BadgeFactorCertificates
                 'menu_name'          => 'Certificates',
             ),
             'rewrite' => array(
-                'slug' => 'certificates',
+                'slug' => 'certificate',
             ),
             'public'             => true,
             'publicly_queryable' => true,
@@ -194,7 +199,7 @@ class BadgeFactorCertificates
             'show_in_menu'       => 'badgeos_badgeos',
             'query_var'          => true,
             'capability_type'    => 'post',
-            'has_archive'        => 'certificates',
+            'has_archive'        => 'certificate',
             'hierarchical'       => true,
             'menu_position'      => null,
             'supports'           => array( 'title' )
@@ -204,13 +209,13 @@ class BadgeFactorCertificates
         if( function_exists('register_field_group') ):
 
             register_field_group(array (
-                'id' => 'acf_certificats',
-                'title' => 'Certificats',
+                'id' => 'acf_certificate',
+                'title' => 'Certificate',
                 'fields' => array (
                     array (
                         'key' => 'field_59159115271cd',
-                        'label' => 'PDF File',
-                        'name' => 'pdf_file',
+                        'label' => 'Certificate Template File (PDF)',
+                        'name' => 'template',
                         'type' => 'file',
                         'required' => 1,
                         'save_format' => 'object',
@@ -341,7 +346,7 @@ class BadgeFactorCertificates
                         array (
                             'param' => 'post_type',
                             'operator' => '==',
-                            'value' => 'certificates',
+                            'value' => 'certificate',
                             'order_no' => 0,
                             'group_no' => 0,
                         ),
@@ -363,6 +368,83 @@ class BadgeFactorCertificates
     }
 
 
+    /**
+     * Handles options page form submission
+     * @param int $post_id Post ID
+     */
+    public function save_certificate_template($post_id)
+    {
+        $post = get_post($post_id);
+        if ($post->post_type === "certificate")
+
+        if ($post_id == 'options')
+        {
+            $archive = get_field('documents_archive', $post_id);
+            $filename = get_attached_file($archive['ID']);
+            if ($this->unzip_archive($filename) === true)
+            {
+                unlink($filename);
+                delete_field('documents_archive', $post_id);
+                wp_delete_attachment($archive['ID'], true);
+            }
+        }
+    }
+
+
+    /**
+     *
+     * Displays badge certificate
+     *
+     * @since 1.0.0
+     */
+    public function display_certificate()
+    {
+        if(preg_match("/^\/members\/([^\/]+)\/badges\/([^\/]+)\/certificate\/?$/", $_SERVER["REQUEST_URI"], $output_array) )
+        {
+            $user_name = $output_array[1];
+            $badge_name = $output_array[2];
+
+            $badge_id = $GLOBALS['badgefactor']->get_badge_id_by_slug($badge_name);
+            $user = get_user_by('login', $user_name);
+
+            $submission = $GLOBALS['badgefactor']->get_submission($badge_id, $user);
+
+            if ($badge_id && ($user->ID === wp_get_current_user()->ID || !$GLOBALS['badgefactor']->is_achievement_private($submission->ID)))
+            {
+                $pdf = new FPDI();
+
+                // TODO Get Certificate Template File path from certificate and add it as the function's parameter
+                //$pdf->setSourceFile();
+                //$templateId = $pdf->importPage(1);
+                //$size = $pdf->getTemplateSize($templateId);
+
+                //$pdf->AddPage('P', array($size['w'], $size['h']));
+                $pdf->AddPage('L');
+
+                //$pdf->useTemplate($templateId);
+
+                // TODO Get Font Family, Type and Size from certificate and add it as the function's parameters
+                $pdf->SetFont('Helvetica', '', 12 );
+
+                // TODO Get Name placement variables and add them as the function's parameters
+                $pdf->SetXY(20, 20);
+
+                // TODO Get Badge recipient name and add it as the function's parameters
+                $pdf->Cell(0, 0, "lorem", 0, 0, "C");
+
+                // TODO Get issue date placement variables and add them as the function's parameters
+                $pdf->SetXY(20, 40);
+
+                // TODO Get Badge issue date and add it as the function's parameters
+                $pdf->Cell(0, 0, "ipsum", 0, 0, "C");
+
+                // TODO Change output name to badge name
+                $pdf->Output('I', 'certificate');
+                exit;
+
+            }
+        }
+    }
 }
 
 function load_badgefactor_cert()
