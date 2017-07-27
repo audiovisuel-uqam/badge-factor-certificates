@@ -193,13 +193,13 @@ class BadgeFactorCertificates
             'rewrite' => array(
                 'slug' => 'certificate',
             ),
-            'public'             => true,
-            'publicly_queryable' => true,
+            'public'             => false,
+            'publicly_queryable' => false,
             'show_ui'            => current_user_can( badgeos_get_manager_capability() ),
             'show_in_menu'       => 'badgeos_badgeos',
             'query_var'          => true,
+            'exclude_from_search'=> true,
             'capability_type'    => 'post',
-            'has_archive'        => 'certificate',
             'hierarchical'       => true,
             'menu_position'      => null,
             'supports'           => array( 'title' )
