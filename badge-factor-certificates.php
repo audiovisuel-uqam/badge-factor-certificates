@@ -174,7 +174,7 @@ class BadgeFactorCertificates
     public function create_cpt_certificate()
     {
         // Register the post type
-        register_post_type( 'certificate', array(
+/*        register_post_type( 'certificate', array(
             'labels'             => array(
                 'name'               => __( 'Certificates', 'badgefactor_cert'),
                 'singular_name'      => __( 'Certificate', 'badgefactor_cert'),
@@ -203,7 +203,7 @@ class BadgeFactorCertificates
             'hierarchical'       => true,
             'menu_position'      => null,
             'supports'           => array( 'title' )
-        ) );
+        ) );*/
 
 
         if( function_exists('register_field_group') ):
@@ -346,19 +346,19 @@ class BadgeFactorCertificates
                         array (
                             'param' => 'post_type',
                             'operator' => '==',
-                            'value' => 'certificate',
-                            'order_no' => 0,
+                            'value' => 'badges',
+                            'order_no' => 10,
                             'group_no' => 0,
                         ),
                     ),
                 ),
                 'options' => array (
                     'position' => 'normal',
-                    'layout' => 'no_box',
+                    'layout' => 'default',
                     'hide_on_screen' => array (
                     ),
                 ),
-                'menu_order' => 0,
+                'menu_order' => 999,
             ));
 
         endif;
@@ -408,35 +408,63 @@ class BadgeFactorCertificates
             $user = get_user_by('login', $user_name);
 
             $submission = $GLOBALS['badgefactor']->get_submission($badge_id, $user);
+			
+			$achievement_id = get_post_meta($badge_id, '_badgeos_submission_achievement_id');
+
+
+			// Get field values
+			$recipient_name = bp_core_get_user_displayname($submission->post_author);
+			$recipient_name_position_x = get_field('recipient_name_position_x', $badge_id );
+			$recipient_name_position_y = get_field('recipient_name_position_y', $badge_id );
+			
+			setlocale(LC_TIME, get_locale(), 0);
+			$issue_date = strftime('%e %B %G', (strtotime( $submission->post_modified ) ));
+			$issue_date_position_x = get_field('issue_date_position_x', $badge_id );
+			$issue_date_position_y = get_field('issue_date_position_y', $badge_id );
+			
+			$badge_cert = get_field('template', $badge_id );
+			$pdf_file = ltrim(parse_url($badge_cert['url'], PHP_URL_PATH), '/');
 
             if ($badge_id && ($user->ID === wp_get_current_user()->ID || !$GLOBALS['badgefactor']->is_achievement_private($submission->ID)))
             {
                 $pdf = new FPDI();
 
-                // TODO Get Certificate Template File path from certificate and add it as the function's parameter
-                //$pdf->setSourceFile();
-                //$templateId = $pdf->importPage(1);
-                //$size = $pdf->getTemplateSize($templateId);
-
-                //$pdf->AddPage('P', array($size['w'], $size['h']));
+				$pdf->setSourceFile($pdf_file);	
+                $templateId = $pdf->importPage(1);
+                $size = $pdf->getTemplateSize($templateId);
+				$w = $size['w'];
+				$h = $size['h'];
                 $pdf->AddPage('L');
-
-                //$pdf->useTemplate($templateId);
+                $pdf->useTemplate($templateId, null, null, $w, $h, TRUE);
 
                 // TODO Get Font Family, Type and Size from certificate and add it as the function's parameters
-                $pdf->SetFont('Helvetica', '', 12 );
+                // TODO Get User name Font options
+				$pdf->SetFont('Helvetica', '', 16 );
 
                 // TODO Get Name placement variables and add them as the function's parameters
-                $pdf->SetXY(20, 20);
+				$pdf->SetXY( 
+					//positionX
+					(($recipient_name_position_x == '-1') ? ($w/2 - $pdf->GetStringWidth($recipient_name)/2) : $recipient_name_position_x),
+					//positionY
+					(($recipient_name_position_y == '-1') ? ($h/2 - $pdf->GetStringHeight($recipient_name)/2) : $recipient_name_position_y)
+				);
 
-                // TODO Get Badge recipient name and add it as the function's parameters
-                $pdf->Cell(0, 0, "lorem", 0, 0, "C");
+                // Get Badge recipient name and add it as the function's parameters
+				$pdf->Cell(0, 0, $recipient_name, 0, "C");
+				
+				// TODO Get Date Font options
+				$pdf->SetFont('Helvetica', '', 12 );
+                
+				// Get issue date placement variables and add them as the function's parameters
+                $pdf->SetXY( 
+					//positionX
+					(($issue_date_position_x == '-1') ? ($w/2 - $pdf->GetStringWidth($issue_date)/2) : $issue_date_position_x),
+					//positionY
+					(($issue_date_position_y == '-1') ? ($h/2 - $pdf->GetStringHeight($issue_date)/2) : $issue_date_position_y)
+				);
 
-                // TODO Get issue date placement variables and add them as the function's parameters
-                $pdf->SetXY(20, 40);
-
-                // TODO Get Badge issue date and add it as the function's parameters
-                $pdf->Cell(0, 0, "ipsum", 0, 0, "C");
+                // Get Badge issue date and add it as the function's parameters
+                $pdf->Cell(0, 0, $issue_date, 0, "C");
 
                 // TODO Change output name to badge name
                 $pdf->Output('I', 'certificate');
