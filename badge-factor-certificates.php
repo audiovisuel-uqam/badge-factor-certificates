@@ -411,7 +411,16 @@ class BadgeFactorCertificates
 			
 			$achievement_id = get_post_meta($badge_id, '_badgeos_submission_achievement_id');
 
-
+			if ($badge_id && ($user->ID === wp_get_current_user()->ID || !$GLOBALS['badgefactor']->is_achievement_private($submission->ID))){
+			
+				//What to do if badge is private: redirect to user page
+				$url = $_SERVER['REQUEST_URI'];
+				$segments = explode('/', parse_url($url, PHP_URL_PATH));
+				$user_path = '/' . $segments[1]. '/' . $segments[2];
+				wp_safe_redirect( $user_path );
+				exit;
+			}
+		
 			// Get field values
 			$recipient_name = bp_core_get_user_displayname($submission->post_author);
 			$recipient_name_position_x = get_field('recipient_name_position_x', $badge_id );
@@ -442,25 +451,25 @@ class BadgeFactorCertificates
 				$pdf->SetFont('Helvetica', '', 16 );
 
                 // TODO Get Name placement variables and add them as the function's parameters
-				$pdf->SetXY( 
-					//positionX
-					(($recipient_name_position_x == '-1') ? ($w/2 - $pdf->GetStringWidth($recipient_name)/2) : $recipient_name_position_x),
-					//positionY
-					(($recipient_name_position_y == '-1') ? ($h/2 - $pdf->GetStringHeight($recipient_name)/2) : $recipient_name_position_y)
-				);
+		$pdf->SetXY( 
+			//positionX
+			(($recipient_name_position_x == '-1') ? ($w/2 - $pdf->GetStringWidth($recipient_name)/2) : $recipient_name_position_x),
+			//positionY
+			(($recipient_name_position_y == '-1') ? ($h/2 - $pdf->GetStringHeight($recipient_name)/2) : $recipient_name_position_y)
+		);
 
                 // Get Badge recipient name and add it as the function's parameters
-				$pdf->Cell(0, 0, utf8_decode($recipient_name), 0, "C");
-				
-				// TODO Get Date Font options
-				$pdf->SetFont('Helvetica', '', 12 );
+		$pdf->Cell(0, 0, utf8_decode($recipient_name), 0, "C");
+
+		// TODO Get Date Font options
+		$pdf->SetFont('Helvetica', '', 12 );
                 
 				// Get issue date placement variables and add them as the function's parameters
                 $pdf->SetXY( 
-					//positionX
-					(($issue_date_position_x == '-1') ? ($w/2 - $pdf->GetStringWidth($issue_date)/2) : $issue_date_position_x),
-					//positionY
-					(($issue_date_position_y == '-1') ? ($h/2 - $pdf->GetStringHeight($issue_date)/2) : $issue_date_position_y)
+			//positionX
+			(($issue_date_position_x == '-1') ? ($w/2 - $pdf->GetStringWidth($issue_date)/2) : $issue_date_position_x),
+			//positionY
+			(($issue_date_position_y == '-1') ? ($h/2 - $pdf->GetStringHeight($issue_date)/2) : $issue_date_position_y)
 				);
 
                 // Get Badge issue date and add it as the function's parameters
