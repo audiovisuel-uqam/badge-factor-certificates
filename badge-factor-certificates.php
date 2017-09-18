@@ -450,7 +450,7 @@ class BadgeFactorCertificates
 				);
 
                 // Get Badge recipient name and add it as the function's parameters
-				$pdf->Cell(0, 0, $recipient_name, 0, "C");
+				$pdf->Cell(0, 0, utf8_decode($recipient_name), 0, "C");
 				
 				// TODO Get Date Font options
 				$pdf->SetFont('Helvetica', '', 12 );
