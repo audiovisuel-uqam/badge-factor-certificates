@@ -466,8 +466,8 @@ class BadgeFactorCertificates
                 // Get Badge issue date and add it as the function's parameters
                 $pdf->Cell(0, 0, $issue_date, 0, "C");
 
-                // TODO Change output name to badge name
-                $pdf->Output('I', 'certificate');
+                // Output badge name
+                $pdf->Output('I', $badge_name . '.pdf');
                 exit;
 
             }
