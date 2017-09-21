@@ -411,7 +411,7 @@ class BadgeFactorCertificates
 			
 			$achievement_id = get_post_meta($badge_id, '_badgeos_submission_achievement_id');
 
-			if ($badge_id && ($user->ID === wp_get_current_user()->ID || !$GLOBALS['badgefactor']->is_achievement_private($submission->ID))){
+			if (!$badge_id || ($user->ID != wp_get_current_user()->ID && $GLOBALS['badgefactor']->is_achievement_private($submission->ID))){
 			
 				//What to do if badge is private: redirect to user page
 				$url = $_SERVER['REQUEST_URI'];
