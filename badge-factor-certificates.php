@@ -217,7 +217,7 @@ class BadgeFactorCertificates
                         'label' => 'Certificate Template File (PDF)',
                         'name' => 'template',
                         'type' => 'file',
-                        'required' => 1,
+                        'required' => 0,
                         'save_format' => 'object',
                         'library' => 'all',
                     ),
