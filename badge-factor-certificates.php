@@ -4,7 +4,7 @@
  * Plugin Name:       Badge Factor Certificate Generator
  * Plugin URI:        https://github.com/DigitalPygmalion/badge-factor-certificates
  * Description:       This plugin generates individual certificates with information concerning issued badges
- * Version:           1.0.0
+ * Version:           1.0.1
  * Author:            ctrlweb
  * Author URI:        https://ctrlweb.ca/
  * License:           MIT
@@ -30,7 +30,8 @@
  * SOFTWARE.
  */
 
-require __DIR__ . '/vendor/autoload.php';
+use setasign\Fpdi\Tfpdf\Fpdi;
+require_once( 'vendor/autoload.php');
 
 class BadgeFactorCertificates
 {
@@ -39,7 +40,7 @@ class BadgeFactorCertificates
      *
      * @var string
      */
-    public static $version = '1.0.0';
+    public static $version = '1.0.1';
 
 
     /**
@@ -79,10 +80,11 @@ class BadgeFactorCertificates
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
 
-        add_action( 'admin_menu',     array($this, 'admin_menu'), 300);
+        // No need for an empty menu
+        //add_action( 'admin_menu',     array($this, 'admin_menu'), 300);
         add_action( 'init', array($this, 'create_cpt_certificate'));
 
-        add_action('parse_request', array($this, 'display_certificate') );
+        add_action('template_redirect', array($this, 'display_certificate'), 1 );
         add_action('acf/save_post', array($this, 'save_certificate_template'), 20 );
 
     }
@@ -399,89 +401,94 @@ class BadgeFactorCertificates
      */
     public function display_certificate()
     {
-        if(preg_match("/^\/members\/([^\/]+)\/badges\/([^\/]+)\/certificate\/?$/", $_SERVER["REQUEST_URI"], $output_array) )
-        {
-            $user_name = $output_array[1];
-            $badge_name = $output_array[2];
+      if(preg_match("/^\/members\/([^\/]+)\/badges\/([^\/]+)\/certificate\/?$/", $_SERVER["REQUEST_URI"], $output_array) )
+      {
+        $user_name = $output_array[1];
+        $badge_name = $output_array[2];
 
-            $badge_id = $GLOBALS['badgefactor']->get_badge_id_by_slug($badge_name);
-            $user = get_user_by('login', $user_name);
+        $badge_id = $GLOBALS['badgefactor']->get_badge_id_by_slug($badge_name);
+        $user = get_user_by('slug', $user_name);
 
-            $submission = $GLOBALS['badgefactor']->get_submission($badge_id, $user);
-			
-			$achievement_id = get_post_meta($badge_id, '_badgeos_submission_achievement_id');
-		
-            		// Redirect if there is a $badge_id, and if the achievement is private to others.
-			if ($badge_id && ($user->ID != wp_get_current_user()->ID && $GLOBALS['badgefactor']->is_achievement_private($submission->ID) === true)){
-			
-				//What to do if badge is private: redirect to user page
-				$url = $_SERVER['REQUEST_URI'];
-				$segments = explode('/', parse_url($url, PHP_URL_PATH));
-				$user_path = '/' . $segments[1]. '/' . $segments[2];
-				wp_safe_redirect( $user_path );
-				exit;
-			}
-		
-			// Get field values
-			$recipient_name = bp_core_get_user_displayname($submission->post_author);
-			$recipient_name_position_x = get_field('recipient_name_position_x', $badge_id );
-			$recipient_name_position_y = get_field('recipient_name_position_y', $badge_id );
-			
-			setlocale(LC_TIME, get_locale(), 0);
-			$issue_date = strftime('%e %B %G', (strtotime( $submission->post_modified ) ));
-			$issue_date_position_x = get_field('issue_date_position_x', $badge_id );
-			$issue_date_position_y = get_field('issue_date_position_y', $badge_id );
-			
-			$badge_cert = get_field('template', $badge_id );
-			$pdf_file = ltrim(parse_url($badge_cert['url'], PHP_URL_PATH), '/');
-
-            if ($badge_id && ($user->ID === wp_get_current_user()->ID || !$GLOBALS['badgefactor']->is_achievement_private($submission->ID)))
-            {
-                $pdf = new FPDI();
-
-				$pdf->setSourceFile($pdf_file);	
-                $templateId = $pdf->importPage(1);
-                $size = $pdf->getTemplateSize($templateId);
-				$w = $size['w'];
-				$h = $size['h'];
-                $pdf->AddPage('L');
-                $pdf->useTemplate($templateId, null, null, $w, $h, TRUE);
-
-                // TODO Get Font Family, Type and Size from certificate and add it as the function's parameters
-                // TODO Get User name Font options
-				$pdf->SetFont('Helvetica', '', 16 );
-
-                // TODO Get Name placement variables and add them as the function's parameters
-		$pdf->SetXY( 
-			//positionX
-			(($recipient_name_position_x == '-1') ? ($w/2 - $pdf->GetStringWidth($recipient_name)/2) : $recipient_name_position_x),
-			//positionY
-			(($recipient_name_position_y == '-1') ? ($h/2 - $pdf->GetStringHeight($recipient_name)/2) : $recipient_name_position_y)
-		);
-
-                // Get Badge recipient name and add it as the function's parameters
-		$pdf->Cell(0, 0, utf8_decode($recipient_name), 0, "C");
-
-		// TODO Get Date Font options
-		$pdf->SetFont('Helvetica', '', 12 );
-                
-				// Get issue date placement variables and add them as the function's parameters
-                $pdf->SetXY( 
-			//positionX
-			(($issue_date_position_x == '-1') ? ($w/2 - $pdf->GetStringWidth($issue_date)/2) : $issue_date_position_x),
-			//positionY
-			(($issue_date_position_y == '-1') ? ($h/2 - $pdf->GetStringHeight($issue_date)/2) : $issue_date_position_y)
-				);
-
-                // Get Badge issue date and add it as the function's parameters
-                $pdf->Cell(0, 0, $issue_date, 0, "C");
-
-                // Output badge name
-                $pdf->Output('I', $badge_name . '.pdf');
-                exit;
-
-            }
+        if (empty($user)){
+          wp_safe_redirect( '/badges\/'. $badge_name, 302, 'BadgeFactorCertificates' );
+          exit;
         }
+
+        $submission = $GLOBALS['badgefactor']->get_submission($badge_id, $user->ID);
+        $achievement_id = get_post_meta($badge_id, '_badgeos_submission_achievement_id');
+
+    		// Redirect if there is a $badge_id, and if the achievement is private to others.
+  			if ($badge_id && ($user->ID != wp_get_current_user()->ID && $GLOBALS['badgefactor']->is_achievement_private($submission->ID) === true)){
+  				//What to do if badge is private: redirect to user page
+  				$url = $_SERVER['REQUEST_URI'];
+  				$segments = explode('/', parse_url($url, PHP_URL_PATH));
+  				$user_path = '/' . $segments[1]. '/' . $segments[2];
+  				wp_safe_redirect( $user_path );
+  				exit;
+  			}
+
+  			// Get field values
+  			$recipient_name = bp_core_get_user_displayname($submission->post_author);
+  			$recipient_name_position_x = get_field('recipient_name_position_x', $badge_id );
+  			$recipient_name_position_y = get_field('recipient_name_position_y', $badge_id );
+
+  			setlocale(LC_TIME, get_locale(), 0);
+  			$issue_date = strftime('%e %B %G', (strtotime( $submission->post_modified ) ));
+  			$issue_date_position_x = get_field('issue_date_position_x', $badge_id );
+  			$issue_date_position_y = get_field('issue_date_position_y', $badge_id );
+
+  			$badge_cert = get_field('template', $badge_id );
+  			$pdf_file = ltrim(parse_url($badge_cert['url'], PHP_URL_PATH), '/');
+
+        if ($badge_id && ($user->ID === wp_get_current_user()->ID || !$GLOBALS['badgefactor']->is_achievement_private($submission->ID)))
+        {
+
+          $pdf = new Fpdi();
+
+          $pdf->AddPage('L');
+          $pdf->setSourceFile($pdf_file);
+          $templateId = $pdf->importPage(1);
+
+          $size = $pdf->getTemplateSize($templateId);
+          $w = $size['width'];
+          $h = $size['height'];
+
+          $pdf->useTemplate($templateId, 0, 0, $w, $h, TRUE);
+
+          // TODO Get Font Family, Type and Size from certificate and add it as the function's parameters
+          // TODO Get User name Font options
+          $pdf->SetFont('Helvetica', '', 16 );
+
+          // TODO Get Name placement variables and add them as the function's parameters
+          $pdf->SetXY(
+            //positionX
+            (($recipient_name_position_x == '-1') ? ($w/2 - $pdf->GetStringWidth($recipient_name)/2) : $recipient_name_position_x),
+            //positionY
+            (($recipient_name_position_y == '-1') ? ($h/2 - $pdf->GetStringHeight($recipient_name)/2) : $recipient_name_position_y)
+          );
+
+          // Get Badge recipient name and add it as the function's parameters
+          $pdf->Cell(0, 0, utf8_decode($recipient_name), 0, "C");
+
+          // TODO Get Date Font options
+          $pdf->SetFont('Helvetica', '', 12 );
+
+          // Get issue date placement variables and add them as the function's parameters
+          $pdf->SetXY(
+            //positionX
+            (($issue_date_position_x == '-1') ? ($w/2 - $pdf->GetStringWidth($issue_date)/2) : $issue_date_position_x),
+            //positionY
+            (($issue_date_position_y == '-1') ? ($h/2 - $pdf->GetStringHeight($issue_date)/2) : $issue_date_position_y)
+          );
+
+          // Get Badge issue date and add it as the function's parameters
+          $pdf->Cell(0, 0, $issue_date, 0, "C");
+
+          header('HTTP/1.1 200 OK');
+          $pdf->Output('I', $badge_name . '.pdf', true );
+          exit;
+        }
+      }
     }
 }
 
@@ -490,4 +497,3 @@ function load_badgefactor_cert()
     $GLOBALS['badgefactor']->cert = new BadgeFactorCertificates();
 }
 add_action('plugins_loaded', 'load_badgefactor_cert');
-
